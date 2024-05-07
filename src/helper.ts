@@ -8,8 +8,8 @@ interface Image {
 }
 // ![](./dsa/aa.png) local image should has ext
 // ![](https://dasdasda) internet image should not has ext
-const REGEX_FILE = /\!\[(.*?)\]\((\S+\.\w+)\)|\!\[(.*?)\]\((https?:\/\/.*?)\)/g;
-const REGEX_WIKI_FILE = /\!\[\[(.*?)(\s*?\|.*?)?\]\]/g;
+const REGEX_FILE = /\!\[([^\]]*?)\]\(([^\)]*?)\)/g;
+const REGEX_WIKI_FILE = /\!\[\[((?!]]).*?)?\]\]/g;
 export default class Helper {
   app: App;
 
@@ -41,7 +41,7 @@ export default class Helper {
   }
   getValue() {
     const editor = this.getEditor();
-    return editor.getValue();
+    return editor?.getValue();
   }
 
   setValue(value: string) {
@@ -86,11 +86,15 @@ export default class Helper {
     }
 
     for (const match of WikiMatches) {
-      let name = parse(match[1]).name;
-      const path = match[1];
+      const REG_TRIM = /^[\s\|]+|[\s\|]+$/g;
       const source = match[0];
-      if (match[2]) {
-        name = `${name}${match[2]}`;
+      const path = match[1].replace(REG_TRIM, '');
+      let name = parse(path).name;
+      // let size = parseInt(source.match(/^(.*?)(\|\s*(\d+)\s*)?\]\]$/)[3]) || undefined
+  
+      let m2 = match[2]?.replace(/^[\s\|]+|[\s\|]+$/g, '')
+      if (m2 && !m2.match(/^\d+$/)) {
+          name = m2.match(/^(.*?)(\|\s*\d+)?$/)[1]?.replaceAll(REG_TRIM, '')
       }
       fileArray.push({
         path: path,
