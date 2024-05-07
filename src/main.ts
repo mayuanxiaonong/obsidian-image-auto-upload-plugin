@@ -12,6 +12,7 @@ import {
   requestUrl,
   MarkdownFileInfo,
 } from "obsidian";
+import { ImageModal } from './imagesDialog';
 
 import { resolve, relative, join, parse, posix, basename, dirname } from "path";
 import { existsSync, mkdirSync, writeFileSync, unlink } from "fs";
@@ -79,8 +80,18 @@ export default class imageAutoUploadPlugin extends Plugin {
     addIcon(
       "upload",
       `<svg t="1636630783429" class="icon" viewBox="0 0 100 100" version="1.1" p-id="4649" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 71.638 35.336 L 79.408 35.336 C 83.7 35.336 87.178 38.662 87.178 42.765 L 87.178 84.864 C 87.178 88.969 83.7 92.295 79.408 92.295 L 17.249 92.295 C 12.957 92.295 9.479 88.969 9.479 84.864 L 9.479 42.765 C 9.479 38.662 12.957 35.336 17.249 35.336 L 25.019 35.336 L 25.019 42.765 L 17.249 42.765 L 17.249 84.864 L 79.408 84.864 L 79.408 42.765 L 71.638 42.765 L 71.638 35.336 Z M 49.014 10.179 L 67.326 27.688 L 61.835 32.942 L 52.849 24.352 L 52.849 59.731 L 45.078 59.731 L 45.078 24.455 L 36.194 32.947 L 30.702 27.692 L 49.012 10.181 Z" p-id="4650" fill="#8a8a8a"></path>
-    </svg>`
+         <path d="M 71.638 35.336 L 79.408 35.336 C 83.7 35.336 87.178 38.662 87.178 42.765 L 87.178 84.864 C 87.178 88.969 83.7 92.295 79.408 92.295 L 17.249 92.295 C 12.957 92.295 9.479 88.969 9.479 84.864 L 9.479 42.765 C 9.479 38.662 12.957 35.336 17.249 35.336 L 25.019 35.336 L 25.019 42.765 L 17.249 42.765 L 17.249 84.864 L 79.408 84.864 L 79.408 42.765 L 71.638 42.765 L 71.638 35.336 Z M 49.014 10.179 L 67.326 27.688 L 61.835 32.942 L 52.849 24.352 L 52.849 59.731 L 45.078 59.731 L 45.078 24.455 L 36.194 32.947 L 30.702 27.692 L 49.012 10.181 Z" p-id="4650" fill="#8a8a8a"></path>
+       </svg>`
+    );
+
+    addIcon(
+      "image-icon",
+      `<svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" class="svg-icon">
+         <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+         <path stroke-linecap="round" d="M3 14l4-4 11 11"></path>
+         <circle cx="13.5" cy="7.5" r="2.5"></circle>
+         <path stroke-linecap="round" d="M13.5 16.5L21 9"></path>
+        </svg>`
     );
 
     this.addSettingTab(new SettingTab(this.app, this));
@@ -113,6 +124,24 @@ export default class imageAutoUploadPlugin extends Plugin {
         return false;
       },
     });
+    this.addCommand({
+      id: "View all image files",
+      name: "View all image files",
+      checkCallback: (checking: boolean) => {
+        if (!checking) {
+          this.viewAllImageFiles();
+        }
+        return true;
+      },
+    });
+
+    this.addRibbonIcon(
+      "image-icon",
+      `${this.manifest.name}`,
+      async () => {
+        this.viewAllImageFiles()
+      }
+    );
 
     this.setupPasteHandler();
     this.registerFileMenu();
@@ -182,6 +211,27 @@ export default class imageAutoUploadPlugin extends Plugin {
     );
   };
 
+  /**
+   * 查看所有含本地图片/网络图片的文件，方便快速处理
+   */
+  async viewAllImageFiles() {
+    const files =  await Promise.all(this.app.vault.getFiles().filter((file) => file.extension === "md").map(async (file) => {
+      const images = await this.app.vault.read(file).then((value) => this.helper.getImageLink(value))
+      // const content = await file.vault.read(file);
+      // const imageLinks = await this.helper.getImageLink(content);
+      const local = images.filter((image) => !image.path.startsWith("http"))
+      const remote = images.filter((image) => image.path.startsWith("http") && !this.helper.hasBlackDomain(
+          image.path,
+          this.settings.newWorkBlackDomains
+      ))
+
+      return {file, local, remote}
+    })).then((vl) => vl.filter((v) => v.local.length > 0 || v.remote.length > 0))
+    new ImageModal(this.app, files).open()
+  }
+
+
+
   async downloadAllImageFiles() {
     const activeFile = this.app.workspace.getActiveFile();
     const folderPath = this.getFileAssetPath();
@@ -189,6 +239,8 @@ export default class imageAutoUploadPlugin extends Plugin {
     if (!existsSync(folderPath)) {
       mkdirSync(folderPath);
     }
+
+    new Notice(`Downloading images in ${activeFile.name}`);
 
     let imageArray = [];
     const nameSet = new Set();
@@ -227,6 +279,8 @@ export default class imageAutoUploadPlugin extends Plugin {
           name: name,
           path: normalizePath(relative(abstractActiveFolder, response.path)),
         });
+      } else {
+        new Notice("Download error")
       }
     }
 
@@ -339,6 +393,10 @@ export default class imageAutoUploadPlugin extends Plugin {
 
   fileMenuUpload(file: TFile) {
     let content = this.helper.getValue();
+    if (!content) {
+      new Notice("读取编辑器内容失败")
+      return
+    }
 
     const basePath = (
       this.app.vault.adapter as FileSystemAdapter
