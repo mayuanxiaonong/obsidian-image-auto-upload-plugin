@@ -18,3 +18,6 @@
 
 2. 增加快捷命令和图标，在弹窗中查看所有含本地图片/网络图片的文件列表（方便管理需要上传或下载的图片）
 
+- <img width="1087" alt="image" src="https://github.com/mayuanxiaonong/obsidian-image-auto-upload-plugin/assets/7379670/e332e679-e25a-4b86-91a1-cef11b354d46">
+
+- <img width="755" alt="image" src="https://github.com/mayuanxiaonong/obsidian-image-auto-upload-plugin/assets/7379670/30f57a23-5b1a-4c0a-b0d4-b4dbbc8ff021">
